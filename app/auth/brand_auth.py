@@ -2,9 +2,14 @@ import secrets
 
 from fastapi import APIRouter, HTTPException
 from authlib.integrations.starlette_client import OAuth
+from fastapi.params import Depends
+from sqlalchemy.orm import Session
 from starlette.requests import Request
 import os
 from dotenv import load_dotenv
+
+from app.database import get_db
+from app.repositories.user_repository import get_or_create_brand_user
 
 load_dotenv()
 
@@ -40,7 +45,7 @@ async def login(request: Request):
     return await oauth.google.authorize_redirect(request, os.getenv("GOOGLE_REDIRECT_URI"), state=state, access_type="offline")
 
 @brand_auth_router.get("/callback")
-async def auth_callback(request: Request):
+async def auth_callback(request: Request, db:Session = Depends(get_db)):
     """Handle Google OAuth callback"""
     try:
         stored_state = request.session.get("oauth_state")  # Retrieve stored state
@@ -56,7 +61,16 @@ async def auth_callback(request: Request):
         token = await oauth.google.authorize_access_token(request)
         user_info = token['userinfo']
 
-        return {"message": "Login successful", "user": user_info}
+        user = get_or_create_brand_user(
+            db=db,
+            google_id=user_info["sub"],
+            name=user_info["name"],
+            email=user_info["email"],
+            profile_picture=user_info.get("picture", ""),
+        )
+        db.close()
+
+        return {"message": "Login successful", "user": user}
 
     except Exception as e:
         print("ERROR:", str(e))
