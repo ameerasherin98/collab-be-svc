@@ -1,0 +1,42 @@
+# Ignore compiled Python files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Virtual environments (if any)
+venv/
+.env/
+.venv/
+
+# Dependency files (if managed by poetry, pip, or pipenv)
+poetry.lock
+Pipfile.lock
+
+# Docker-related ignores
+docker-compose.override.yml
+*.env
+
+# Ignore IDE/editor config files
+.vscode/
+.idea/
+*.swp
+*.swo
+*.swn
+
+# Ignore logs and caches
+*.log
+*.cache/
+*.pytest_cache/
+*.mypy_cache/
+
+# Ignore macOS-specific files
+.DS_Store
+
+# Ignore generated coverage files
+.coverage
+htmlcov/
+coverage.xml
+
+# Ignore temporary files
+tmp/
