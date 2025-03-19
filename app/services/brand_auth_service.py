@@ -1,17 +1,17 @@
-import secrets
-
-from fastapi import APIRouter, HTTPException
-from authlib.integrations.starlette_client import OAuth
-from starlette.requests import Request
 import os
+from fastapi import HTTPException
+from authlib.integrations.starlette_client import OAuth
+from sqlalchemy.orm import Session
+from starlette.requests import Request
 from dotenv import load_dotenv
+
+from app.repositories.user_repository import get_or_create_brand_user
 
 load_dotenv()
 
-brand_auth_router = APIRouter()
-
-# Configure OAuth
+# Initialize OAuth
 oauth = OAuth()
+
 oauth.register(
     name="google",
     client_id=os.getenv("GOOGLE_CLIENT_ID"),
@@ -32,16 +32,8 @@ oauth.register(
     client_kwargs={"scope": "openid email profile"},
 )
 
-@brand_auth_router.get("/login")
-async def login(request: Request):
-    """Redirect user to Google login page"""
-    state = secrets.token_urlsafe(16)  # Generate a secure random state
-    request.session["oauth_state"] = state  # Store state in session
-    return await oauth.google.authorize_redirect(request, os.getenv("GOOGLE_REDIRECT_URI"), state=state, access_type="offline")
-
-@brand_auth_router.get("/callback")
-async def auth_callback(request: Request):
-    """Handle Google OAuth callback"""
+async def handle_oauth_callback(request: Request, db: Session):
+    """Process the OAuth callback, validate state, and create a user."""
     try:
         stored_state = request.session.get("oauth_state")  # Retrieve stored state
         received_state = request.query_params.get("state")  # Get state from URL
@@ -54,9 +46,20 @@ async def auth_callback(request: Request):
 
         # Exchange the code for a token
         token = await oauth.google.authorize_access_token(request)
-        user_info = token['userinfo']
+        user_info = token.get("userinfo")
 
-        return {"message": "Login successful", "user": user_info}
+        if not user_info:
+            raise HTTPException(status_code=400, detail="Failed to retrieve user info.")
+
+        user = get_or_create_brand_user(
+            db=db,
+            google_id=user_info["sub"],
+            name=user_info["name"],
+            email=user_info["email"],
+            profile_picture=user_info.get("picture", ""),
+        )
+
+        return {"message": "Login successful", "user": user}
 
     except Exception as e:
         print("ERROR:", str(e))

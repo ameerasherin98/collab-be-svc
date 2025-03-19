@@ -2,14 +2,16 @@ import os
 
 from dotenv import load_dotenv
 from fastapi import FastAPI
-from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.middleware.sessions import SessionMiddleware
 
-from app.auth.brand_auth import brand_auth_router
+from app.api.auth.brand_auth import brand_auth_router
+from app.database import create_tables
 
 load_dotenv()
 
 app = FastAPI()
+
+create_tables()
 
 SESSION_SECRET_KEY = os.getenv("SESSION_SECRET_KEY", "supersecretkey")
 
