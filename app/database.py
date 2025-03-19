@@ -17,6 +17,11 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 # Declarative base
 Base = declarative_base()
 
+# Create missing tables
+
+def create_tables():
+    Base.metadata.create_all(bind=engine)
+
 # Dependency function to get the database session
 def get_db():
     db = SessionLocal()  # Create a new database session
