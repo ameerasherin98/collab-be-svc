@@ -16,3 +16,11 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 # Declarative base
 Base = declarative_base()
+
+# Dependency function to get the database session
+def get_db():
+    db = SessionLocal()  # Create a new database session
+    try:
+        yield db  # Provide the session to the request
+    finally:
+        db.close()  # Close the session after request is completed
