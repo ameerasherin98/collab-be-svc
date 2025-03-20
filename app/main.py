@@ -6,6 +6,7 @@ from starlette.middleware.sessions import SessionMiddleware
 
 from app.api.auth.brand_auth import brand_auth_router
 from app.database import create_tables
+from app.middlewear.auth_middleware import JWTMiddleware
 
 load_dotenv()
 
@@ -19,4 +20,5 @@ app.add_middleware(
     SessionMiddleware,
     secret_key=SESSION_SECRET_KEY
 )
+app.add_middleware(JWTMiddleware)
 app.include_router(brand_auth_router, prefix="/auth")
