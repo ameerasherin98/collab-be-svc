@@ -1,13 +1,21 @@
 import os
+import datetime
+
+from authlib.jose import jwt
 from fastapi import HTTPException
 from authlib.integrations.starlette_client import OAuth
 from sqlalchemy.orm import Session
 from starlette.requests import Request
 from dotenv import load_dotenv
+from starlette.responses import JSONResponse
 
 from app.repositories.user_repository import get_or_create_brand_user
 
 load_dotenv()
+
+# JWT Secret and Algorithm
+JWT_SECRET = os.getenv("JWT_SECRET_KEY")
+JWT_ALGORITHM = "HS256"
 
 # Initialize OAuth
 oauth = OAuth()
@@ -31,6 +39,18 @@ oauth.register(
     redirect_uri=os.getenv("GOOGLE_REDIRECT_URI"),
     client_kwargs={"scope": "openid email profile"},
 )
+
+def create_jwt(user):
+    """Generate a JWT token for the authenticated user."""
+    now = datetime.datetime.now()
+    payload = {
+        "sub": user.google_id,
+        "email": user.email,
+        "exp": now + datetime.timedelta(days=3),  # 7-day expiration
+        "iat": now
+    }
+    header = {"alg": JWT_ALGORITHM}
+    return jwt.encode(header, payload, JWT_SECRET)
 
 async def handle_oauth_callback(request: Request, db: Session):
     """Process the OAuth callback, validate state, and create a user."""
@@ -59,7 +79,18 @@ async def handle_oauth_callback(request: Request, db: Session):
             profile_picture=user_info.get("picture", ""),
         )
 
-        return {"message": "Login successful", "user": user}
+        # Generate JWT Token
+        access_token = create_jwt(user)
+        response = JSONResponse(content={"message": "Login successful"})
+        response.set_cookie(
+            key="access_token",
+            value=access_token,
+            httponly=True,  # Prevents JS access (XSS protection)
+            secure=True,  # Use True in production (requires HTTPS)
+            max_age=3 * 24 * 60 * 60,  # 7 days expiration
+        )
+
+        return response
 
     except Exception as e:
         print("ERROR:", str(e))

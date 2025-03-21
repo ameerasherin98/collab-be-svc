@@ -4,6 +4,7 @@ from fastapi import APIRouter, HTTPException, Depends
 from sqlalchemy.orm import Session
 from starlette.requests import Request
 from dotenv import load_dotenv
+from starlette.responses import RedirectResponse
 
 from app.database import get_db
 from app.services.brand_auth_service import oauth, handle_oauth_callback
@@ -28,4 +29,5 @@ async def login(request: Request):
 @brand_auth_router.get("/callback")
 async def auth_callback(request: Request, db: Session = Depends(get_db)):
     """Handle Google OAuth callback."""
-    return await handle_oauth_callback(request, db)
+    response = await handle_oauth_callback(request, db)
+    return RedirectResponse("http://localhost:3000/")
