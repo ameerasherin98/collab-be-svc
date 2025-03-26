@@ -3,126 +3,39 @@ from sqlalchemy.orm import Session
 import uuid
 
 from app.database import get_db
-from app.models.campaign import Campaign, CampaignStatus
-from app.schemas.campaign import (
-    CampaignResponse, CampaignCreate, Budget, InfluencerCriteria,
-    TargetAudience, ContentRequirements, PerformanceMetrics
-)
+from app.schemas.campaign import CampaignResponse, CampaignCreate
+from app.repositories.campaign_repository import get_campaign_by_id, create_campaign, update_campaign, delete_campaign
+from app.services.campaign_service import create_campaign_entity, map_campaign_to_response
 
 campaign_router = APIRouter()
 
-
-def get_campaign_by_id(campaign_id: uuid.UUID, db: Session) -> Campaign:
-    campaign = db.query(Campaign).filter(Campaign.campaign_id == campaign_id).first()
-    if not campaign:
-        raise HTTPException(status_code=404, detail="Campaign not found")
-    return campaign
-
-
-def map_campaign_to_response(campaign: Campaign) -> CampaignResponse:
-    return CampaignResponse(
-        campaign_id=campaign.campaign_id,
-        brand_id=campaign.brand_id,
-        campaign_name=campaign.campaign_name,
-        campaign_description=campaign.campaign_description,
-        campaign_type=campaign.campaign_type,
-        start_date=campaign.start_date,
-        end_date=campaign.end_date,
-        budget=Budget(
-            currency=campaign.budget_currency,
-            total_amount=campaign.budget_total_amount,
-            per_influencer=campaign.budget_per_influencer,
-        ),
-        influencer_criteria=InfluencerCriteria(
-            influencer_type=campaign.influencer_type,
-            category=campaign.category,
-            followers_min=campaign.followers_min,
-            followers_max=campaign.followers_max,
-            engagement_rate_min=campaign.engagement_rate_min,
-            location=campaign.location,
-        ),
-        target_audience=TargetAudience(
-            age_min=campaign.target_age_min,
-            age_max=campaign.target_age_max,
-            gender=campaign.target_gender,
-            location=campaign.target_location,
-            interests=campaign.target_interests,
-        ),
-        content_requirements=ContentRequirements(
-            platforms=campaign.platforms,
-            content_formats=campaign.content_formats,
-            number_of_posts=campaign.number_of_posts,
-            hashtags=campaign.hashtags,
-            mentions=campaign.mentions,
-            brand_guidelines=campaign.brand_guidelines,
-            approval_required=campaign.approval_required,
-        ),
-        performance_metrics=PerformanceMetrics(
-            expected_reach=campaign.expected_reach,
-            expected_engagement=campaign.expected_engagement,
-            expected_conversions=campaign.expected_conversions,
-            tracking_links=campaign.tracking_links,
-            promo_codes=campaign.promo_codes,
-        ),
-        status=campaign.status,
-        created_at=campaign.created_at,
-        updated_at=campaign.updated_at,
-    )
-
-
 @campaign_router.post("/", response_model=CampaignResponse)
-def create_campaign(campaign_data: CampaignCreate, db: Session = Depends(get_db)):
-    campaign = Campaign(
-        brand_id=campaign_data.brand_id,
-        campaign_name=campaign_data.campaign_name,
-        campaign_description=campaign_data.campaign_description,
-        campaign_type=campaign_data.campaign_type,
-        start_date=campaign_data.start_date,
-        end_date=campaign_data.end_date,
-
-        budget_currency=campaign_data.budget.currency,
-        budget_total_amount=campaign_data.budget.total_amount,
-        budget_per_influencer=campaign_data.budget.per_influencer,
-
-        influencer_type=campaign_data.influencer_criteria.influencer_type,
-        category=campaign_data.influencer_criteria.category,
-        followers_min=campaign_data.influencer_criteria.followers_min,
-        followers_max=campaign_data.influencer_criteria.followers_max,
-        engagement_rate_min=campaign_data.influencer_criteria.engagement_rate_min,
-        location=campaign_data.influencer_criteria.location,
-        language_preference=campaign_data.influencer_criteria.language_preference,
-
-        status=CampaignStatus.draft
-    )
-
-    db.add(campaign)
-    db.commit()
-    db.refresh(campaign)
+def create_campaign_endpoint(campaign_data: CampaignCreate, db: Session = Depends(get_db)):
+    campaign = create_campaign_entity(campaign_data)
+    campaign = create_campaign(db, campaign)
     return map_campaign_to_response(campaign)
-
 
 @campaign_router.get("/{campaign_id}", response_model=CampaignResponse)
-def get_campaign(campaign_id: uuid.UUID, db: Session = Depends(get_db)):
-    campaign = get_campaign_by_id(campaign_id, db)
+def get_campaign_endpoint(campaign_id: uuid.UUID, db: Session = Depends(get_db)):
+    campaign = get_campaign_by_id(db, campaign_id)
+    if not campaign:
+        raise HTTPException(status_code=404, detail="Campaign not found")
     return map_campaign_to_response(campaign)
-
 
 @campaign_router.put("/{campaign_id}", response_model=CampaignResponse)
-def update_campaign(campaign_id: uuid.UUID, campaign_data: CampaignCreate, db: Session = Depends(get_db)):
-    campaign = get_campaign_by_id(campaign_id, db)
+def update_campaign_endpoint(campaign_id: uuid.UUID, campaign_data: CampaignCreate, db: Session = Depends(get_db)):
+    campaign = get_campaign_by_id(db, campaign_id)
+    if not campaign:
+        raise HTTPException(status_code=404, detail="Campaign not found")
 
-    for field, value in campaign_data.model_dump(exclude_unset=True).items():
-        setattr(campaign, field, value)
-
-    db.commit()
-    db.refresh(campaign)
-    return map_campaign_to_response(campaign)
-
+    updated_campaign = update_campaign(db, campaign, campaign_data.dict(exclude_unset=True))
+    return map_campaign_to_response(updated_campaign)
 
 @campaign_router.delete("/{campaign_id}")
-def delete_campaign(campaign_id: uuid.UUID, db: Session = Depends(get_db)):
-    campaign = get_campaign_by_id(campaign_id, db)
+def delete_campaign_endpoint(campaign_id: uuid.UUID, db: Session = Depends(get_db)):
+    campaign = get_campaign_by_id(db, campaign_id)
+    if not campaign:
+        raise HTTPException(status_code=404, detail="Campaign not found")
 
-    db.delete(campaign)
-    db.commit()
+    delete_campaign(db, campaign)
     return {"detail": "Campaign deleted successfully"}
