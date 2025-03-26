@@ -30,4 +30,4 @@ async def login(request: Request):
 async def auth_callback(request: Request, db: Session = Depends(get_db)):
     """Handle Google OAuth callback."""
     response = await handle_oauth_callback(request, db)
-    return RedirectResponse("http://localhost:3000/")
+    return RedirectResponse("http://localhost:3000/dashboard")

@@ -11,6 +11,10 @@ from app.middlewear.auth_middleware import JWTMiddleware
 load_dotenv()
 
 app = FastAPI()
+@app.get("/")
+def root():
+    return {"message": "Hello, World!"}
+
 
 create_tables()
 
